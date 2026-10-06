@@ -1,19 +1,20 @@
 import { Hono } from 'hono'
+import { csrf } from 'hono/csrf'
 import { requireOwner } from './auth'
 import type { AppEnv } from './env'
+import { api } from './routes/api'
+import { bookings } from './routes/bookings'
 
 const app = new Hono<AppEnv>()
 
-// Unauthenticated liveness check (also used by the Stripe webhook route later).
+// Unauthenticated liveness check. Everything else is owner-only.
 app.get('/health', (c) => c.json({ ok: true }))
 
-app.use('/api/*', requireOwner)
+app.use('*', requireOwner)
+app.use('*', csrf())
 
-app.get('/api/me', (c) => c.json({ email: c.get('userEmail') }))
-
-app.get('/api/settings', async (c) => {
-  const settings = await c.env.DB.prepare('SELECT * FROM settings WHERE id = 1').first()
-  return c.json(settings)
-})
+app.get('/', (c) => c.redirect('/bookings'))
+app.route('/bookings', bookings)
+app.route('/api', api)
 
 export default app

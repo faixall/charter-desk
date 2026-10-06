@@ -13,6 +13,7 @@ npm install
 npm run db:migrate:local   # create local D1 tables
 npm run dev                # http://localhost:8787 (auth bypassed in dev)
 npm run typecheck
+npm test
 ```
 
 ## Deploying
