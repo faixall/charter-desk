@@ -15,8 +15,8 @@ enabled = true
 ENVIRONMENT = "production"
 OWNER_EMAIL = "faixall@gmail.com"
 # Cloudflare Access: team domain (e.g. https://yourteam.cloudflareaccess.com) and application AUD tag.
-ACCESS_TEAM_DOMAIN = ""
-ACCESS_AUD = ""
+ACCESS_TEAM_DOMAIN = "https://omadhooinn.cloudflareaccess.com"
+ACCESS_AUD = "6fe480b4e6348f21ba30087f11d2f63d190707f85a376fe4694d3763a915ab49"
 
 [[d1_databases]]
 binding = "DB"
