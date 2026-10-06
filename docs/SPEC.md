@@ -17,6 +17,7 @@ Internal booking tool for a single speedboat charter operator. Customers never u
 | 9 | Fleet | One boat (hidden `boat_id` kept for future expansion) |
 | 10 | Cancellations | Case by case: cancel dialog with editable refund amount (pre-filled full), Stripe refund |
 | 11 | Stack | Cloudflare Workers + D1, SvelteKit/React frontend, passkey or Cloudflare Access |
+| 12 | Expenses | Fuel (litres, engine hours), maintenance (engine hours), accessories, other; monthly income vs expenses |
 
 ## Booking lifecycle
 
@@ -37,7 +38,8 @@ Rescheduling = editing date/time on a booking (optional "reason: weather" note).
   stripe_payment_link_id, stripe_payment_link_url, payment_expires_at, paid_at,
   refund_amount_cents, cancelled_reason, created_at, updated_at
 - **price_list**: id, boat_id, duration_min, price_cents
-- **seasons**: id, name, start_date, end_date, multiplier
+- **seasons**: id, name, start_md, end_md (MM-DD, repeats yearly, may wrap New Year), multiplier
+- **expenses**: id, boat_id, date, category (fuel|maintenance|accessories|other), amount_cents, currency, vendor, description, fuel_litres, engine_hours
 - **settings**: turnaround_buffer_min, payment_link_ttl_hours, currency, timezone
 
 ## Screens
@@ -47,6 +49,7 @@ Rescheduling = editing date/time on a booking (optional "reason: weather" note).
 3. **Booking detail** — status actions: Confirm (shows suggested price, editable → creates Stripe link, copy/share to WhatsApp), Decline, Edit/Reschedule, Cancel & refund, Mark completed.
 4. **Calendar** — single-lane day/week view.
 5. **Settings** — price list, seasons, buffer, link TTL, currency/timezone.
+6. **Expenses** — month view: charter income (booked + completed), expenses by category, net; litres and average fuel price; add/edit/delete with fuel- and maintenance-specific fields.
 
 ## Integrations
 
@@ -56,7 +59,7 @@ Rescheduling = editing date/time on a booking (optional "reason: weather" note).
 
 ## Out of scope (v1)
 
-Public booking page, customer accounts, multiple users/roles, multiple boats UI, extras/add-ons, policy-based refunds, WhatsApp API integration, translations.
+Receipt photos, public booking page, customer accounts, multiple users/roles, multiple boats UI, extras/add-ons, policy-based refunds, WhatsApp API integration, translations.
 
 ## Build order
 

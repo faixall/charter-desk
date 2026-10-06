@@ -4,6 +4,7 @@ import { requireOwner } from './auth'
 import type { AppEnv } from './env'
 import { api } from './routes/api'
 import { bookings } from './routes/bookings'
+import { expenses } from './routes/expenses'
 import { home } from './routes/home'
 import { settings } from './routes/settings'
 
@@ -17,6 +18,7 @@ app.use('*', csrf())
 
 app.route('/', home)
 app.route('/bookings', bookings)
+app.route('/expenses', expenses)
 app.route('/settings', settings)
 app.route('/api', api)
 

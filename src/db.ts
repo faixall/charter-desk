@@ -1,4 +1,5 @@
 import { BLOCKING_STATUSES } from './lib/clash'
+import type { ExpenseCategory } from './lib/expenses'
 import type { PriceTier, Season } from './lib/pricing'
 import type { Source, Status } from './lib/status'
 
@@ -249,4 +250,71 @@ export async function updateSettings(db: D1Database, s: Settings) {
     )
     .bind(s.turnaround_buffer_min, s.payment_link_ttl_hours, s.currency, s.timezone)
     .run()
+}
+
+// --- Expenses ---
+
+export type Expense = {
+  id: number
+  date: string
+  category: ExpenseCategory
+  amount_cents: number
+  currency: string
+  vendor: string | null
+  description: string | null
+  fuel_litres: number | null
+  engine_hours: number | null
+}
+
+export type ExpenseInput = Omit<Expense, 'id'>
+
+export async function listExpenses(db: D1Database, fromDate: string, toDate: string, category?: ExpenseCategory) {
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM expenses WHERE boat_id = 1 AND date >= ? AND date < ?
+       ${category ? 'AND category = ?' : ''} ORDER BY date DESC, id DESC`,
+    )
+    .bind(fromDate, toDate, ...(category ? [category] : []))
+    .all<Expense>()
+  return results
+}
+
+export async function getExpense(db: D1Database, id: number) {
+  return db.prepare('SELECT * FROM expenses WHERE id = ?').bind(id).first<Expense>()
+}
+
+export async function insertExpense(db: D1Database, e: ExpenseInput) {
+  await db
+    .prepare(
+      `INSERT INTO expenses (date, category, amount_cents, currency, vendor, description, fuel_litres, engine_hours)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(e.date, e.category, e.amount_cents, e.currency, e.vendor, e.description, e.fuel_litres, e.engine_hours)
+    .run()
+}
+
+export async function updateExpense(db: D1Database, id: number, e: Omit<ExpenseInput, 'currency'>) {
+  await db
+    .prepare(
+      `UPDATE expenses SET date = ?, category = ?, amount_cents = ?, vendor = ?, description = ?,
+       fuel_litres = ?, engine_hours = ?, updated_at = ? WHERE id = ?`,
+    )
+    .bind(e.date, e.category, e.amount_cents, e.vendor, e.description, e.fuel_litres, e.engine_hours, now(), id)
+    .run()
+}
+
+export async function deleteExpense(db: D1Database, id: number) {
+  await db.prepare('DELETE FROM expenses WHERE id = ?').bind(id).run()
+}
+
+/** Charter income for trips starting in [fromIso, toIso): confirmed money only (booked or completed). */
+export async function incomeBetween(db: D1Database, fromIso: string, toIso: string) {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(final_price_cents), 0) AS cents, COUNT(*) AS trips FROM bookings
+       WHERE status IN ('booked','completed') AND start_at >= ? AND start_at < ?`,
+    )
+    .bind(fromIso, toIso)
+    .first<{ cents: number; trips: number }>()
+  return row ?? { cents: 0, trips: 0 }
 }
