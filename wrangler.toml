@@ -1,0 +1,18 @@
+name = "charter-desk"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Set to "production" in the deployed Worker; "dev" skips Cloudflare Access verification.
+ENVIRONMENT = "dev"
+OWNER_EMAIL = "faixall@gmail.com"
+# Cloudflare Access: team domain (e.g. https://yourteam.cloudflareaccess.com) and application AUD tag.
+ACCESS_TEAM_DOMAIN = ""
+ACCESS_AUD = ""
+
+[[d1_databases]]
+binding = "DB"
+database_name = "charter-desk"
+# Replace with the id from `wrangler d1 create charter-desk` before deploying.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
