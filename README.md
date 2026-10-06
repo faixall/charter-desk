@@ -10,15 +10,17 @@ See [docs/SPEC.md](docs/SPEC.md) for the full v1 spec and build order.
 
 ```sh
 npm install
-npm run db:migrate:local   # create local D1 tables
-npm run dev                # http://localhost:8787 (auth bypassed in dev)
+cp .dev.vars.example .dev.vars   # runs locally with the login check off
+npm run db:migrate:local         # create local D1 tables
+npm run dev                      # http://localhost:8787
 npm run typecheck
 npm test
 ```
 
-## Deploying
+## Deployment
 
-1. `npx wrangler d1 create charter-desk` and put the returned `database_id` in `wrangler.toml`.
-2. `npm run db:migrate:remote`
-3. In Cloudflare Zero Trust, create an Access application for the Worker's hostname allowing only the owner's email; copy the team domain and AUD tag into `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD`.
-4. Set `ENVIRONMENT = "production"` and `npm run deploy`.
+- **Database:** D1 `charter-desk` (Asia-Pacific). Apply new migrations with `npm run db:migrate:remote`.
+- **Deploys:** Workers Builds, connected to this repo — every push to `main` runs `npx wrangler deploy`.
+- **Login:** Cloudflare Access on the `workers.dev` URL. The Worker also verifies the Access token itself
+  and only allows `OWNER_EMAIL`. Set `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` in `wrangler.toml`; until both
+  are set every request gets 401.

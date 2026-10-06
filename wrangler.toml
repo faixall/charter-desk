@@ -2,9 +2,17 @@ name = "charter-desk"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
+# Only the workers.dev URL is used, protected by Cloudflare Access. Preview URLs stay off.
+workers_dev = true
+preview_urls = false
+
+[observability]
+enabled = true
+
 [vars]
-# Set to "production" in the deployed Worker; "dev" skips Cloudflare Access verification.
-ENVIRONMENT = "dev"
+# "production" requires a valid Cloudflare Access login on every request.
+# `npm run dev` overrides this to "dev" (see .dev.vars.example), which skips the check locally.
+ENVIRONMENT = "production"
 OWNER_EMAIL = "faixall@gmail.com"
 # Cloudflare Access: team domain (e.g. https://yourteam.cloudflareaccess.com) and application AUD tag.
 ACCESS_TEAM_DOMAIN = ""
@@ -13,6 +21,5 @@ ACCESS_AUD = ""
 [[d1_databases]]
 binding = "DB"
 database_name = "charter-desk"
-# Replace with the id from `wrangler d1 create charter-desk` before deploying.
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "777ce008-d08b-4fce-8729-1d63535ef106"
 migrations_dir = "migrations"
