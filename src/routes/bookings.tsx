@@ -5,6 +5,8 @@ import {
   getSettings,
   insertBooking,
   listBookings,
+  listPriceTiers,
+  listSeasons,
   transitionBooking,
   updateBooking,
   upsertCustomer,
@@ -16,6 +18,7 @@ import {
 import type { AppEnv } from '../env'
 import { findClashes } from '../lib/clash'
 import { parseMoneyToCents } from '../lib/money'
+import { suggestPrice, type Suggestion } from '../lib/pricing'
 import { isValidPhone, normalizePhone } from '../lib/phone'
 import { SOURCES, isAction, nextStatus, type Source } from '../lib/status'
 import { isDateString, utcToZoned, zonedToUtc } from '../lib/time'
@@ -45,7 +48,7 @@ bookings.get('/new', async (c) => {
 })
 
 type Parsed =
-  | { ok: true; customer: { name: string; phone: string; email: string | null }; start: Date; booking: Omit<BookingInput, 'customerId' | 'startAt'> }
+  | { ok: true; customer: { name: string; phone: string; email: string | null }; start: Date; booking: Omit<BookingInput, 'customerId' | 'startAt' | 'currency'> }
   | { ok: false; errors: string[] }
 
 function parseForm(v: BookingFormValues, settings: Settings): Parsed {
@@ -109,7 +112,12 @@ async function save(
   }
 
   const customerId = await upsertCustomer(db, parsed.customer)
-  const input: BookingInput = { ...parsed.booking, customerId, startAt: parsed.start.toISOString() }
+  const input: BookingInput = {
+    ...parsed.booking,
+    customerId,
+    currency: settings.currency,
+    startAt: parsed.start.toISOString(),
+  }
   if (existingId) {
     await updateBooking(db, existingId, input)
     return { id: existingId }
@@ -125,6 +133,11 @@ bookings.post('/', async (c) => {
   return c.html(<BookingForm action="/bookings" title="New request" values={values} settings={settings} {...result} />, 422)
 })
 
+async function suggestionFor(db: D1Database, b: BookingWithCustomer, settings: Settings): Promise<Suggestion | null> {
+  const [tiers, seasons] = await Promise.all([listPriceTiers(db, b.boat_id), listSeasons(db)])
+  return suggestPrice(tiers, seasons, b.duration_min, utcToZoned(b.start_at, settings.timezone).date)
+}
+
 function parseId(raw: string): number | null {
   const id = Number(raw)
   return Number.isInteger(id) && id > 0 ? id : null
@@ -135,7 +148,8 @@ bookings.get('/:id', async (c) => {
   const booking = id && (await getBooking(c.env.DB, id))
   if (!booking) return c.notFound()
   const settings = await getSettings(c.env.DB)
-  return c.html(<BookingDetail booking={booking} settings={settings} />)
+  const suggestion = await suggestionFor(c.env.DB, booking, settings)
+  return c.html(<BookingDetail booking={booking} settings={settings} suggestion={suggestion} />)
 })
 
 bookings.get('/:id/edit', async (c) => {
@@ -178,7 +192,9 @@ bookings.post('/:id/status', async (c) => {
   const settings = await getSettings(c.env.DB)
   const body = await c.req.parseBody()
   const action = typeof body.action === 'string' ? body.action : ''
-  const fail = (error: string) => c.html(<BookingDetail booking={booking} settings={settings} error={error} />, 422)
+  const suggestion = await suggestionFor(c.env.DB, booking, settings)
+  const fail = (error: string) =>
+    c.html(<BookingDetail booking={booking} settings={settings} suggestion={suggestion} error={error} />, 422)
 
   if (!isAction(action)) return fail('Unknown action.')
   const to = nextStatus(booking.status, action)
@@ -189,6 +205,8 @@ bookings.post('/:id/status', async (c) => {
     const cents = parseMoneyToCents(typeof body.price === 'string' ? body.price : '')
     if (cents == null || cents === 0) return fail('Enter the price before confirming.')
     fields.final_price_cents = cents
+    // Keep what the price list said at confirmation time, so discounts show up later.
+    fields.suggested_price_cents = suggestion?.cents ?? null
     fields.payment_expires_at = new Date(Date.now() + settings.payment_link_ttl_hours * 3600_000).toISOString()
   } else if (action === 'mark_paid') {
     fields.paid_at = new Date().toISOString()

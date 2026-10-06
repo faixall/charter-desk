@@ -1,6 +1,7 @@
 import type { BookingFilter, BookingWithCustomer, Settings } from '../db'
 import { centsToInput, formatCents } from '../lib/money'
 import { whatsappUrl } from '../lib/phone'
+import { formatMultiplier, type Suggestion } from '../lib/pricing'
 import { SOURCES, SOURCE_LABELS, STATUS_LABELS, availableActions, type Status } from '../lib/status'
 import { formatDateTime, formatDuration } from '../lib/time'
 import { Layout } from './layout'
@@ -200,8 +201,46 @@ const ACTION_BUTTONS = {
   complete: 'Mark completed',
 } as const
 
-export function BookingDetail(props: { booking: BookingWithCustomer; settings: Settings; error?: string }) {
-  const { booking: b, settings, error } = props
+function SuggestionHint(props: { suggestion: Suggestion | null | undefined; durationMin: number; currency: string }) {
+  const { suggestion: s, durationMin, currency } = props
+  if (!s) {
+    return (
+      <div class="suggest">
+        No price list yet — <a href="/settings">add prices</a> to get a suggestion.
+      </div>
+    )
+  }
+  const parts = [`${formatDuration(durationMin)} ${formatCents(s.baseCents, currency)}${s.exactTier ? '' : ' (from price list)'}`]
+  if (s.season) parts.push(`${s.season.name} ${formatMultiplier(s.season.multiplier)}`)
+  return (
+    <div class="suggest">
+      Suggested <strong>{formatCents(s.cents, currency)}</strong> · {parts.join(', ')}
+    </div>
+  )
+}
+
+function PriceWithDiscount({ b }: { b: BookingWithCustomer }) {
+  const { final_price_cents: final, suggested_price_cents: suggested } = b
+  if (final == null || suggested == null || suggested === final) return <>{formatCents(final, b.currency)}</>
+  const pct = Math.round(((final - suggested) / suggested) * 100)
+  return (
+    <>
+      {formatCents(final, b.currency)}{' '}
+      <span class="muted">
+        (list {formatCents(suggested, b.currency)}, {pct > 0 ? '+' : ''}
+        {pct}%)
+      </span>
+    </>
+  )
+}
+
+export function BookingDetail(props: {
+  booking: BookingWithCustomer
+  settings: Settings
+  suggestion?: Suggestion | null
+  error?: string
+}) {
+  const { booking: b, settings, suggestion, error } = props
   const tz = settings.timezone
   const actions = availableActions(b.status)
   return (
@@ -233,7 +272,9 @@ export function BookingDetail(props: { booking: BookingWithCustomer; settings: S
           <dt>Via</dt>
           <dd>{SOURCE_LABELS[b.source]}</dd>
           <dt>Price</dt>
-          <dd>{formatCents(b.final_price_cents, b.currency)}</dd>
+          <dd>
+            <PriceWithDiscount b={b} />
+          </dd>
           {b.payment_expires_at && b.status === 'awaiting_payment' && (
             <>
               <dt>Pay by</dt>
@@ -270,10 +311,13 @@ export function BookingDetail(props: { booking: BookingWithCustomer; settings: S
               inputmode="decimal"
               placeholder={`Price (${b.currency})`}
               required
-              value={centsToInput(b.final_price_cents ?? b.suggested_price_cents)}
+              value={centsToInput(b.final_price_cents ?? suggestion?.cents)}
             />
             <button class="btn primary">Confirm</button>
           </form>
+        )}
+        {actions.includes('confirm') && (
+          <SuggestionHint suggestion={suggestion} durationMin={b.duration_min} currency={b.currency} />
         )}
         {(Object.keys(ACTION_BUTTONS) as (keyof typeof ACTION_BUTTONS)[])
           .filter((a) => actions.includes(a))

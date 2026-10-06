@@ -1,4 +1,5 @@
 import { BLOCKING_STATUSES } from './lib/clash'
+import type { PriceTier, Season } from './lib/pricing'
 import type { Source, Status } from './lib/status'
 
 export type Settings = {
@@ -44,6 +45,7 @@ export type BookingWithCustomer = Booking & {
 
 export type BookingInput = {
   customerId: number
+  currency: string
   startAt: string
   durationMin: number
   partySize: number
@@ -132,10 +134,10 @@ export async function blockingBookingsNear(db: D1Database, start: Date, boatId =
 export async function insertBooking(db: D1Database, b: BookingInput): Promise<number> {
   const row = await db
     .prepare(
-      `INSERT INTO bookings (customer_id, start_at, duration_min, party_size, source, notes)
-       VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+      `INSERT INTO bookings (customer_id, start_at, duration_min, party_size, source, notes, currency)
+       VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     )
-    .bind(b.customerId, b.startAt, b.durationMin, b.partySize, b.source, b.notes)
+    .bind(b.customerId, b.startAt, b.durationMin, b.partySize, b.source, b.notes, b.currency)
     .first<{ id: number }>()
   return row!.id
 }
@@ -159,7 +161,9 @@ export async function transitionBooking(
   id: number,
   from: Status,
   to: Status,
-  fields: Partial<Pick<Booking, 'final_price_cents' | 'payment_expires_at' | 'paid_at' | 'cancelled_reason'>> = {},
+  fields: Partial<
+    Pick<Booking, 'suggested_price_cents' | 'final_price_cents' | 'payment_expires_at' | 'paid_at' | 'cancelled_reason'>
+  > = {},
 ): Promise<boolean> {
   const entries = Object.entries(fields)
   const sets = ['status = ?', 'updated_at = ?', ...entries.map(([k]) => `${k} = ?`)].join(', ')
@@ -192,4 +196,57 @@ export async function bookingsNeedingAction(db: D1Database) {
     .bind(now())
     .all<BookingWithCustomer>()
   return results
+}
+
+// --- Pricing & settings ---
+
+export type PriceTierRow = PriceTier & { id: number }
+
+export async function listPriceTiers(db: D1Database, boatId = 1): Promise<PriceTierRow[]> {
+  const { results } = await db
+    .prepare('SELECT id, duration_min, price_cents FROM price_list WHERE boat_id = ? ORDER BY duration_min')
+    .bind(boatId)
+    .all<PriceTierRow>()
+  return results
+}
+
+/** Setting a price for a duration that already exists replaces it. */
+export async function upsertPriceTier(db: D1Database, durationMin: number, priceCents: number, boatId = 1) {
+  await db
+    .prepare(
+      `INSERT INTO price_list (boat_id, duration_min, price_cents) VALUES (?, ?, ?)
+       ON CONFLICT (boat_id, duration_min) DO UPDATE SET price_cents = excluded.price_cents`,
+    )
+    .bind(boatId, durationMin, priceCents)
+    .run()
+}
+
+export async function deletePriceTier(db: D1Database, id: number) {
+  await db.prepare('DELETE FROM price_list WHERE id = ?').bind(id).run()
+}
+
+export async function listSeasons(db: D1Database): Promise<Season[]> {
+  const { results } = await db.prepare('SELECT * FROM seasons ORDER BY start_md').all<Season>()
+  return results
+}
+
+export async function insertSeason(db: D1Database, s: Omit<Season, 'id'>) {
+  await db
+    .prepare('INSERT INTO seasons (name, start_md, end_md, multiplier) VALUES (?, ?, ?, ?)')
+    .bind(s.name, s.start_md, s.end_md, s.multiplier)
+    .run()
+}
+
+export async function deleteSeason(db: D1Database, id: number) {
+  await db.prepare('DELETE FROM seasons WHERE id = ?').bind(id).run()
+}
+
+export async function updateSettings(db: D1Database, s: Settings) {
+  await db
+    .prepare(
+      `UPDATE settings SET turnaround_buffer_min = ?, payment_link_ttl_hours = ?, currency = ?, timezone = ?
+       WHERE id = 1`,
+    )
+    .bind(s.turnaround_buffer_min, s.payment_link_ttl_hours, s.currency, s.timezone)
+    .run()
 }
