@@ -5,8 +5,31 @@ import { SOURCES, SOURCE_LABELS, STATUS_LABELS, availableActions, type Status } 
 import { formatDateTime, formatDuration } from '../lib/time'
 import { Layout } from './layout'
 
-function Badge({ status }: { status: Status }) {
+export function Badge({ status }: { status: Status }) {
   return <span class={`badge ${status}`}>{STATUS_LABELS[status]}</span>
+}
+
+export function BookingCard(props: {
+  booking: BookingWithCustomer
+  heading: string
+  reason?: { label: string; urgent: boolean }
+}) {
+  const { booking: b, heading, reason } = props
+  return (
+    <a class={`card${reason?.urgent ? ' urgent' : ''}`} href={`/bookings/${b.id}`}>
+      {reason && <div class="reason">{reason.label}</div>}
+      <div class="row">
+        <strong>{heading}</strong>
+        <Badge status={b.status} />
+      </div>
+      <div class="row muted">
+        <span>
+          {b.customer_name} · {b.party_size} pax · {formatDuration(b.duration_min)}
+        </span>
+        <span>{formatCents(b.final_price_cents, b.currency)}</span>
+      </div>
+    </a>
+  )
 }
 
 const TABS: [BookingFilter, string][] = [
@@ -18,7 +41,7 @@ const TABS: [BookingFilter, string][] = [
 export function BookingList(props: { bookings: BookingWithCustomer[]; filter: BookingFilter; settings: Settings }) {
   const { bookings, filter, settings } = props
   return (
-    <Layout title="Bookings">
+    <Layout title="Bookings" section="bookings">
       <nav class="tabs">
         {TABS.map(([key, label]) => (
           <a href={`/bookings?filter=${key}`} class={key === filter ? 'on' : ''}>
@@ -28,18 +51,7 @@ export function BookingList(props: { bookings: BookingWithCustomer[]; filter: Bo
       </nav>
       {bookings.length === 0 && <p class="muted">Nothing here yet.</p>}
       {bookings.map((b) => (
-        <a class="card" href={`/bookings/${b.id}`}>
-          <div class="row">
-            <strong>{formatDateTime(b.start_at, settings.timezone)}</strong>
-            <Badge status={b.status} />
-          </div>
-          <div class="row muted">
-            <span>
-              {b.customer_name} · {b.party_size} pax · {formatDuration(b.duration_min)}
-            </span>
-            <span>{formatCents(b.final_price_cents, b.currency)}</span>
-          </div>
-        </a>
+        <BookingCard booking={b} heading={formatDateTime(b.start_at, settings.timezone)} />
       ))}
     </Layout>
   )
@@ -105,7 +117,7 @@ export function BookingForm(props: {
   const { values: v, errors, clashes, settings } = props
   const durations = DURATIONS.includes(Number(v.duration_min)) ? DURATIONS : [...DURATIONS, Number(v.duration_min)]
   return (
-    <Layout title={props.title}>
+    <Layout title={props.title} section="bookings">
       <h1>{props.title}</h1>
       {errors && errors.length > 0 && (
         <div class="alert error">
@@ -193,7 +205,7 @@ export function BookingDetail(props: { booking: BookingWithCustomer; settings: S
   const tz = settings.timezone
   const actions = availableActions(b.status)
   return (
-    <Layout title={b.customer_name}>
+    <Layout title={b.customer_name} section="bookings">
       {error && <div class="alert error">{error}</div>}
       <div class="row">
         <h1>{formatDateTime(b.start_at, tz)}</h1>

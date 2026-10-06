@@ -169,3 +169,27 @@ export async function transitionBooking(
     .run()
   return result.meta.changes === 1
 }
+
+// Bookings that are still "on the books" — shown on the home screen and calendar.
+const LIVE_STATUSES = ['requested', 'awaiting_payment', 'booked', 'completed'] as const
+
+export async function bookingsBetween(db: D1Database, fromIso: string, toIso: string) {
+  const placeholders = LIVE_STATUSES.map(() => '?').join(',')
+  const { results } = await db
+    .prepare(`${BOOKING_SELECT} WHERE b.status IN (${placeholders}) AND b.start_at >= ? AND b.start_at < ? ORDER BY b.start_at`)
+    .bind(...LIVE_STATUSES, fromIso, toIso)
+    .all<BookingWithCustomer>()
+  return results
+}
+
+/** Everything waiting on the operator: requests, unpaid confirmations, and finished trips not yet closed. */
+export async function bookingsNeedingAction(db: D1Database) {
+  const { results } = await db
+    .prepare(
+      `${BOOKING_SELECT} WHERE b.status IN ('requested','awaiting_payment')
+       OR (b.status = 'booked' AND b.start_at < ?) ORDER BY b.start_at`,
+    )
+    .bind(now())
+    .all<BookingWithCustomer>()
+  return results
+}

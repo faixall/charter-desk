@@ -4,6 +4,7 @@ import { requireOwner } from './auth'
 import type { AppEnv } from './env'
 import { api } from './routes/api'
 import { bookings } from './routes/bookings'
+import { home } from './routes/home'
 
 const app = new Hono<AppEnv>()
 
@@ -13,7 +14,7 @@ app.get('/health', (c) => c.json({ ok: true }))
 app.use('*', requireOwner)
 app.use('*', csrf())
 
-app.get('/', (c) => c.redirect('/bookings'))
+app.route('/', home)
 app.route('/bookings', bookings)
 app.route('/api', api)
 

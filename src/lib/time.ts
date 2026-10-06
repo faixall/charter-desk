@@ -76,3 +76,51 @@ export function formatDuration(min: number): string {
 export function addMinutes(d: Date, min: number): Date {
   return new Date(d.getTime() + min * 60_000)
 }
+
+// Calendar-date helpers. Dates are plain "YYYY-MM-DD" strings in the boat's timezone;
+// arithmetic happens at UTC noon so it never trips over DST.
+
+function dateToUtcNoon(date: string): Date {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, 12))
+}
+
+export function isDateString(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(dateToUtcNoon(value).getTime())
+}
+
+export function todayIn(tz: string, now = new Date()): string {
+  return utcToZoned(now.toISOString(), tz).date
+}
+
+export function addDays(date: string, days: number): string {
+  const d = dateToUtcNoon(date)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Monday of the week containing `date`. */
+export function startOfWeek(date: string): string {
+  const dow = (dateToUtcNoon(date).getUTCDay() + 6) % 7 // 0 = Monday
+  return addDays(date, -dow)
+}
+
+/** e.g. "Tue 6 Oct" */
+export function formatDay(date: string): string {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(
+    dateToUtcNoon(date),
+  )
+}
+
+/** e.g. "14:00" */
+export function formatTime(iso: string, tz: string): string {
+  return utcToZoned(iso, tz).time
+}
+
+/** Coarse "in 5h" / "40m ago" style offset from `now`. */
+export function formatRelative(iso: string, now = new Date()): string {
+  const diffMin = Math.round((new Date(iso).getTime() - now.getTime()) / 60_000)
+  const abs = Math.abs(diffMin)
+  const amount = abs < 60 ? `${abs}m` : abs < 48 * 60 ? `${Math.round(abs / 60)}h` : `${Math.round(abs / 1440)}d`
+  return diffMin >= 0 ? `in ${amount}` : `${amount} ago`
+}

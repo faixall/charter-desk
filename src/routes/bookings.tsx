@@ -18,7 +18,7 @@ import { findClashes } from '../lib/clash'
 import { parseMoneyToCents } from '../lib/money'
 import { isValidPhone, normalizePhone } from '../lib/phone'
 import { SOURCES, isAction, nextStatus, type Source } from '../lib/status'
-import { utcToZoned, zonedToUtc } from '../lib/time'
+import { isDateString, utcToZoned, zonedToUtc } from '../lib/time'
 import { BookingDetail, BookingForm, BookingList, EMPTY_FORM, type BookingFormValues } from '../views/bookings'
 
 export const bookings = new Hono<AppEnv>()
@@ -34,7 +34,14 @@ bookings.get('/', async (c) => {
 
 bookings.get('/new', async (c) => {
   const settings = await getSettings(c.env.DB)
-  return c.html(<BookingForm action="/bookings" title="New request" values={EMPTY_FORM} settings={settings} />)
+  const date = c.req.query('date') ?? ''
+  const time = c.req.query('time') ?? ''
+  const values = {
+    ...EMPTY_FORM,
+    date: isDateString(date) ? date : '',
+    time: /^\d{2}:\d{2}$/.test(time) ? time : '',
+  }
+  return c.html(<BookingForm action="/bookings" title="New request" values={values} settings={settings} />)
 })
 
 type Parsed =

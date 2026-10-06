@@ -16,7 +16,9 @@ const css = `
 * { box-sizing: border-box; }
 body { margin: 0; font: 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
 header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
-header a.brand { font-weight: 700; color: var(--text); text-decoration: none; margin-right: auto; }
+header nav { display: flex; gap: 4px; margin-right: auto; }
+header nav a { padding: 8px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; font-weight: 600; }
+header nav a.on { color: var(--text); background: var(--bg); }
 main { max-width: 720px; margin: 0 auto; padding: 16px; }
 h1 { font-size: 1.35rem; margin: 4px 0 16px; }
 a { color: var(--accent); }
@@ -48,10 +50,46 @@ textarea { min-height: 80px; }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
 dt { color: var(--muted); }
 dd { margin: 0; }
+h2 { font-size: 1rem; margin: 24px 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
+h2 a { font-size: .9rem; font-weight: 600; }
+.card.urgent { border-color: var(--danger); }
+.reason { font-size: .88rem; font-weight: 600; margin-bottom: 4px; color: var(--accent); }
+.card.urgent .reason { color: var(--danger); }
+.weeknav { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.weeknav h1 { margin: 0 auto 0 0; font-size: 1.15rem; }
+.weeknav .btn { min-height: 38px; padding: 0 12px; }
+.day { margin-bottom: 14px; }
+.day-head { display: flex; justify-content: space-between; font-size: .9rem; font-weight: 600; margin-bottom: 4px; }
+.day-head a { text-decoration: none; }
+.day.today .day-head span { color: var(--accent); }
+.hours { position: relative; height: 16px; font-size: .7rem; color: var(--muted); margin-bottom: 4px; }
+.hours span { position: absolute; transform: translateX(-50%); }
+.hours span:first-child { transform: none; }
+.hours span.last { transform: translateX(-100%); }
+.tl { position: relative; height: 46px; border: 1px solid var(--border); border-radius: 8px; background-color: var(--surface);
+  background-image: repeating-linear-gradient(to right, var(--border) 0 1px, transparent 1px calc(100% / var(--hours))); }
+.blk { position: absolute; top: 4px; bottom: 4px; border-radius: 6px; padding: 3px 4px; overflow: hidden; white-space: nowrap;
+  font-size: .75rem; font-weight: 600; line-height: 1.3; text-decoration: none; background: var(--accent); color: var(--accent-text); }
+.blk span { display: block; overflow: hidden; text-overflow: ellipsis; }
+.blk span:first-child { text-overflow: clip; letter-spacing: -.02em; }
+.blk span + span { font-weight: 500; }
+.blk.requested { background: var(--surface); border: 2px dashed var(--accent); color: var(--accent); }
+.blk.awaiting_payment { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--text); }
+.blk.completed { opacity: .55; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: .8rem; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 14px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: middle; }
 .hint { font-size: .88rem; color: var(--muted); margin-top: 6px; min-height: 1.2em; }
 `
 
-export function Layout(props: { title: string; children: Child }) {
+const NAV = [
+  ['/', 'Home'],
+  ['/calendar', 'Calendar'],
+  ['/bookings', 'Bookings'],
+] as const
+
+export type Section = 'home' | 'calendar' | 'bookings'
+
+export function Layout(props: { title: string; section?: Section; children: Child }) {
   return (
     <html lang="en">
       <head>
@@ -62,8 +100,14 @@ export function Layout(props: { title: string; children: Child }) {
       </head>
       <body>
         <header>
-          <a class="brand" href="/bookings">Charter Desk</a>
-          <a class="btn primary" href="/bookings/new">+ New request</a>
+          <nav>
+            {NAV.map(([href, label]) => (
+              <a href={href} class={label.toLowerCase() === props.section ? 'on' : ''}>
+                {label}
+              </a>
+            ))}
+          </nav>
+          <a class="btn primary" href="/bookings/new">+ New</a>
         </header>
         <main>{props.children}</main>
       </body>
