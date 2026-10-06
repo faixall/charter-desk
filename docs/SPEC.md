@@ -9,20 +9,20 @@ Internal booking tool for a single speedboat charter operator. Customers never u
 | 1 | Business model | Single operator |
 | 2 | Product | Private charters — whole boat + captain for a block of time |
 | 3 | Booking flow | Request-based: operator confirms manually |
-| 4 | Payment | Stripe Payment Link sent after confirmation; unpaid links expire (default 24h) |
+| 4 | Payment | Collected outside the app (cash, card, transfer); operator taps "Mark as paid". Unpaid confirmations are due within a set window (default 24h). Stripe links deferred. |
 | 5 | Audience | Operator-only internal tool, mobile-first PWA |
 | 6 | Intake | Manual quick-add form (requests arrive via WhatsApp/phone/Instagram/walk-in) |
 | 7 | Users | Owner only — one login |
 | 8 | Pricing | Price list (duration → price, optional season multiplier), always overridable |
 | 9 | Fleet | One boat (hidden `boat_id` kept for future expansion) |
-| 10 | Cancellations | Case by case: cancel dialog with editable refund amount (pre-filled full), Stripe refund |
+| 10 | Cancellations | Case by case: cancel with a reason; any refund handled outside the app |
 | 11 | Stack | Cloudflare Workers + D1, SvelteKit/React frontend, passkey or Cloudflare Access |
 | 12 | Expenses | Fuel (litres, engine hours), maintenance (engine hours), accessories, other; monthly income vs expenses |
 
 ## Booking lifecycle
 
 ```
-requested ──confirm──▶ awaiting_payment ──paid (webhook)──▶ booked ──▶ completed
+requested ──confirm──▶ awaiting_payment ──mark paid──▶ booked ──▶ completed
     │                        │                                 │
     └─decline─▶ declined     └─link expires─▶ expired          └─cancel─▶ cancelled (refund_amount)
 ```
@@ -46,20 +46,19 @@ Rescheduling = editing date/time on a booking (optional "reason: weather" note).
 
 1. **Home** — Today & tomorrow's charters; "Needs action" (unconfirmed requests, unpaid links nearing expiry); big "+ New request" button.
 2. **Quick-add** — phone lookup auto-fills customer; date, start time, duration, party size, source, notes. Clash warning (non-blocking) if overlapping a confirmed/booked charter incl. turnaround buffer. Target: < 30 s from a WhatsApp chat.
-3. **Booking detail** — status actions: Confirm (shows suggested price, editable → creates Stripe link, copy/share to WhatsApp), Decline, Edit/Reschedule, Cancel & refund, Mark completed.
+3. **Booking detail** — status actions: Confirm (suggested price, editable), Decline, Mark as paid, Edit/Reschedule, Cancel, Mark completed.
 4. **Calendar** — single-lane day/week view.
 5. **Settings** — price list, seasons, buffer, link TTL, currency/timezone.
 6. **Expenses** — month view: charter income (booked + completed), expenses by category, net; litres and average fuel price; add/edit/delete with fuel- and maintenance-specific fields.
 
 ## Integrations
 
-- **Stripe**: create Payment Link on confirm (metadata: booking_id); webhook `checkout.session.completed` → `booked`; refunds via API.
 - **Scheduled Worker (cron)**: expire unpaid links; daily morning summary push.
-- **Web Push** (PWA): new payment received, links about to expire, morning summary.
+- **Web Push** (PWA): payments coming due, morning summary.
 
 ## Out of scope (v1)
 
-Receipt photos, public booking page, customer accounts, multiple users/roles, multiple boats UI, extras/add-ons, policy-based refunds, WhatsApp API integration, translations.
+Stripe payment links and refunds, receipt photos, public booking page, customer accounts, multiple users/roles, multiple boats UI, extras/add-ons, policy-based refunds, WhatsApp API integration, translations.
 
 ## Build order
 
@@ -67,6 +66,6 @@ Receipt photos, public booking page, customer accounts, multiple users/roles, mu
 2. Customers + quick-add + booking list/detail
 3. Home "today / needs action" + calendar
 4. Price list + suggested pricing
-5. Stripe links, webhook, refunds
+5. ~~Stripe links, webhook, refunds~~ — deferred (payments marked by hand)
 6. Cron expiry, push notifications, PWA install
 7. Deploy
